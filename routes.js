@@ -1,13 +1,19 @@
 var React = require('react/addons');
-var ChartApp = React.createFactory(require('./app/components/ChartApp.js').ChartApp);
-var data = require('./app/data/data.json');
+var ChartApp = React.createFactory(require('./app/components/ChartApp').ChartApp);
+var temperature = require('./app/data/temp.json');
 
 module.exports = function(app) {
     app.get('/', function(req, res){
         // React.renderToString takes your component
         // and generates the markup
 
-        var reactHtml = React.renderToString(ChartApp({data: data}));
+        var reactHtml = React.renderToString(
+            ChartApp({
+                data: temperature,
+                height: 700,
+                width: 1000
+            })
+        );
         // Output html rendered by react
         res.render('index.ejs', { reactOutput: reactHtml });
     });

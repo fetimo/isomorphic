@@ -1,6 +1,6 @@
 var React = require('react/addons');
-var _ = require('underscore');
 var d3 = require('d3');
+var color = d3.scale.category10();
 
 var Chart = React.createClass({
     render: function() {
@@ -36,12 +36,12 @@ var DataSeries = React.createClass({
     render: function() {
         var self = this,
             props = this.props,
-            yScale = props.yScale,
-            xScale = props.xScale;
+            y = props.y,
+            x = props.x;
 
         var path = d3.svg.line()
-            .x(function(d) { return xScale(d.x); })
-            .y(function(d) { return yScale(d.y); })
+            .x(function(d) { return x(d.year); })
+            .y(function(d) { return y(d.Winter); })
             .interpolate(this.props.interpolate);
 
         return (
@@ -64,83 +64,66 @@ var LineChart = React.createClass({
                 height: this.props.height
             };
 
-        var zippedArray = _.zip.apply(_, data.data);
+        var parseDate = d3.time.format('%Y').parse;
 
-        var years = zippedArray[0];
-        var winterTemp = zippedArray[1];
-        // var winterPrecip = zippedArray[2];
-        var summerTemp = zippedArray[3];
-        // var summerPrecip = zippedArray[4];
+        color.domain(d3.keys(data[0]).filter(function(key) {
+            return key !== 'year';
+        }));
 
-        var max = _.chain(x[0], x[1], x[2], x[3], x[4])
-            .zip()
-            .map(function(values) {
-                return _.reduce(values, function(memo, value) {
-                    return Math.max(memo, value.y);
-                }, 0);
-            })
-            .max()
-            .value();
-
-        var xScale = d3.scale.linear()
-            .domain([0, 6])
-            .range([0, this.props.width]);
-
-        var yScale = d3.scale.linear()
-            .domain([0, max])
-            .range([this.props.height, 0]);
-
-        return (
-            <div>
-                <Chart width={this.props.width} height={this.props.height}>
-                    <DataSeries data={data.series1} size={size} xScale={xScale} yScale={yScale} ref="series1" color="cornflowerblue" />
-                    <DataSeries data={data.series2} size={size} xScale={xScale} yScale={yScale} ref="series2" color="red" />
-                    <DataSeries data={data.series3} size={size} xScale={xScale} yScale={yScale} ref="series3" color="green" />
-                    <DataSeries data={data.series3} size={size} xScale={xScale} yScale={yScale} ref="series4" color="goldenrod" />
-                </Chart>
-                <RangeInput />
-            </div>
-        );
-    }
-});
-
-var RangeInput = React.createClass({
-    getDefaultProps: function() {
-        return {
-            min: 1,
-            max: 10,
-            step: 1
-        };
-    },
-    handleChange: function (event) {
-        var modifier = parseInt(event.target.value, 10);
-
-        this._owner.props.data.series1.forEach(function (item) {
-
-            var x = (modifier / item.y) * 100;
-            var y = (x / 100) * item.y;
-
-            if (modifier > 5) {
-                item.y += y;
-            } else {
-                item.y -= y;
+        data.forEach(function(d) {
+            if (typeof d.year === 'string') {
+                d.year = parseDate(d.year);
             }
-
-            console.log(item.y);
-            // item.y = Math.random() * 100;
         });
 
-        this._owner.forceUpdate();
-    },
-    render: function() {
+        var series = color.domain().map(function(name) {
+            return {
+                name: name,
+                values: data.map(function(d) {
+                    var temp;
+                    if (name === 'Winter') {
+                        temp = 4 + parseFloat(d[name]);
+                    } else {
+                        temp = 15.2 + parseFloat(d[name]);
+                    }
+                    return {year: d.year, temperature: temp};
+                })
+            };
+        });
+
+        var x = d3.time.scale()
+            .domain(d3.extent(data, function(d) {
+                return d.year;
+            }))
+            .range([0, this.props.width]);
+
+        var y = d3.scale.linear()
+            .domain([
+                d3.min(series, function(c) {
+                    return d3.min(c.values, function(v) {
+                        return v.temperature;
+                    });
+                }),
+                d3.max(series, function(c) {
+                    return d3.max(c.values, function(v) {
+                        return v.temperature;
+                    });
+                })
+            ])
+            .range([this.props.height, 0]);
+
+        var xAxis = d3.svg.axis()
+            .scale(x)
+            .orient('bottom');
+
+        var yAxis = d3.svg.axis()
+            .scale(y)
+            .orient('left');
+
         return (
-            <input
-                type="range"
-                onChange={this.handleChange}
-                min={this.props.min}
-                max={this.props.max}
-                value={this.props.value}
-                step={this.props.step} />
+            <Chart width={this.props.width} height={this.props.height}>
+                <DataSeries data={data} size={size} x={x} y={y} ref="Winter" color="cornflowerblue" />
+            </Chart>
         );
     }
 });
