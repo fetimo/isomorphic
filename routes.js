@@ -9,11 +9,10 @@ module.exports = function(app) {
 
         var reactHtml = React.renderToString(
             ChartApp({
-                data: temperature,
-                height: 700,
-                width: 1000
+                data: temperature
             })
         );
+
         // Output html rendered by react
         res.render('index.ejs', { reactOutput: reactHtml });
     });

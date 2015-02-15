@@ -1,12 +1,22 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var React = require('react/addons');
 var d3 = require('d3');
+
 var color = d3.scale.category10();
 
 var Chart = React.createClass({displayName: "Chart",
+    getDefaultProps: function() {
+        return {
+            margin: 'translate(50, 20)'
+        };
+    },
     render: function() {
         return (
-            React.createElement("svg", {width: this.props.width, height: this.props.height}, this.props.children)
+            React.createElement("svg", {width: this.props.width, height: this.props.height}, 
+                React.createElement("g", {transform: this.props.margin}, 
+                    this.props.children
+                )
+            )
         );
     }
 });
@@ -26,6 +36,21 @@ var Line = React.createClass({displayName: "Line",
     }
 });
 
+var XAxis = React.createClass({displayName: "XAxis",
+    getDefaultProps: function() {
+        return {
+            path: '',
+            color: 'blue',
+            width: 2
+        };
+    },
+    render: function() {
+        return (
+            React.createElement("g", {class: ""})
+        );
+    }
+});
+
 var DataSeries = React.createClass({displayName: "DataSeries",
     getDefaultProps: function() {
         return {
@@ -37,13 +62,13 @@ var DataSeries = React.createClass({displayName: "DataSeries",
     render: function() {
         var self = this,
             props = this.props,
-            y = props.y,
-            x = props.x;
+            y = this.props.y,
+            x = this.props.x;
 
         var path = d3.svg.line()
+            .interpolate(this.props.interpolate)
             .x(function(d) { return x(d.year); })
-            .y(function(d) { return y(d.Winter); })
-            .interpolate(this.props.interpolate);
+            .y(function(d) { return y(d.temperature); });
 
         return (
             React.createElement(Line, {path: path(this.props.data), color: this.props.color})
@@ -58,6 +83,24 @@ var LineChart = React.createClass({displayName: "LineChart",
             height: 300
         };
     },
+    componentDidMount: function () {
+        var svg = d3.select(this.getDOMNode().children[0]);
+
+        svg.insert('g', ':first-child')
+            .attr('class', 'y axis')
+            .call(yAxis)
+            .append('text')
+            .attr('transform', 'rotate(-90)')
+            .attr('y', 6)
+            .attr('dy', '1em')
+            .style('text-anchor', 'end')
+            .text('Temperature (ºC)');
+
+        svg.insert('g', ':first-child')
+            .attr('class', 'x axis')
+            .attr('transform', 'translate(0,' + (this.props.height - 40) + ')')
+            .call(xAxis);
+    },
     render: function() {
         var data = this.props.data,
             size = {
@@ -67,62 +110,68 @@ var LineChart = React.createClass({displayName: "LineChart",
 
         var parseDate = d3.time.format('%Y').parse;
 
-        color.domain(d3.keys(data[0]).filter(function(key) {
+        xAxis = d3.svg.axis().orient('bottom');
+        yAxis = d3.svg.axis().orient('left');
+
+        var summer = [];
+        var winter = [];
+
+        color.domain(d3.keys(data[0]).filter(function (key) {
             return key !== 'year';
         }));
 
-        data.forEach(function(d) {
-            d.year = parseDate(d.year);
+        data.forEach(function (d) {
+            if (typeof d.year === 'string') {
+                d.year = parseDate(d.year);
+            }
+
+            summer.push({
+                year: d.year,
+                temperature: 15.2 + parseFloat(d.Summer)
+            });
+
+            winter.push({
+                year: d.year,
+                temperature: 4 + parseFloat(d.Winter)
+            });
         });
 
-        var series = color.domain().map(function(name) {
+        var series = color.domain().map(function (name) {
             return {
                 name: name,
-                values: data.map(function(d) {
-                    var temp;
-                    if (name === 'Winter') {
-                        temp = 4 + parseFloat(d[name]);
-                    } else {
-                        temp = 15.2 + parseFloat(d[name]);
-                    }
-                    return {year: d.year, temperature: temp};
+                values: data.map(function (d) {
+                    return {
+                        year: d.year,
+                        temperature: d[name]
+                    };
                 })
             };
         });
 
         var x = d3.time.scale()
-            .domain(d3.extent(data, function(d) {
+            .domain(d3.extent(data, function (d) {
                 return d.year;
             }))
             .range([0, this.props.width]);
 
         var y = d3.scale.linear()
             .domain([
-                d3.min(series, function(c) {
-                    return d3.min(c.values, function(v) {
-                        return v.temperature;
-                    });
+                d3.min(winter, function (c) {
+                    return c.temperature;
                 }),
-                d3.max(series, function(c) {
-                    return d3.max(c.values, function(v) {
-                        return v.temperature;
-                    });
+                d3.max(summer, function (c) {
+                    return c.temperature;
                 })
             ])
             .range([this.props.height, 0]);
 
-        var xAxis = d3.svg.axis()
-            .scale(x)
-            .orient('bottom');
-
-        var yAxis = d3.svg.axis()
-            .scale(y)
-            .orient('left');
+        xAxis.scale(x);
+        yAxis.scale(y);
 
         return (
             React.createElement(Chart, {width: this.props.width, height: this.props.height}, 
-                React.createElement(DataSeries, {data: data, size: size, x: x, y: y, ref: "Winter", color: "cornflowerblue"}), 
-                React.createElement(DataSeries, {data: data, size: size, x: x, y: y, ref: "Summer", color: "orange"})
+                React.createElement(DataSeries, {data: winter, size: size, x: x, y: y, ref: "Winter", color: "cornflowerblue"}), 
+                React.createElement(DataSeries, {data: summer, size: size, x: x, y: y, ref: "Summer", color: "orange"})
             )
         );
     }
@@ -974,13 +1023,24 @@ module.exports=[
 },{}],3:[function(require,module,exports){
 var React = require('react/addons');
 var ChartApp = require('./components/ChartApp').ChartApp;
-// var RangeInput = require('./components/RangeInput');
+
 var ReactApp = React.createFactory(ChartApp);
 var mountNode = document.getElementById('react-main-mount');
 
 var temperature = require('./data/temp.json');
 
-React.render(new ReactApp({ data: temperature }), mountNode);
+var margin = {top: 20, right: 80, bottom: 30, left: 50},
+    width = window.innerWidth - margin.left - margin.right,
+    height = window.innerHeight - margin.top - margin.bottom;
+
+React.render(new ReactApp({
+    data: temperature,
+    height: height,
+    width: width,
+    margin: {
+        transform: 'translate(' + margin.left + ', ' + margin.top + ')'
+    }
+}), mountNode);
 
 
 },{"./components/ChartApp":1,"./data/temp.json":2,"react/addons":6}],4:[function(require,module,exports){
