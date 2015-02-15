@@ -1,13 +1,14 @@
 var React = require('react/addons');
 var d3 = require('d3');
 
-var color = d3.scale.category10();
-
 var Chart = React.createClass({
     render: function() {
+        var height = this.props.height + 20 + 30;
+        var width = this.props.width + 50 + 80;
+
         return (
-            <svg width={this.props.width} height={this.props.height}>
-                <g transform="translate(50, 20)">
+            <svg width={width} height={height}>
+                <g transform="translate(20, 0)">
                     {this.props.children}
                 </g>
             </svg>
@@ -31,16 +32,32 @@ var Line = React.createClass({
 });
 
 var XAxis = React.createClass({
-    getDefaultProps: function() {
-        return {
-            path: '',
-            color: 'blue',
-            width: 2
-        };
+    componentDidMount: function () {
+        var xAxis = d3.svg.axis().orient('bottom').scale(this.props.x);
+        d3.select(this.getDOMNode()).call(xAxis);
     },
     render: function() {
+        var transform = 'translate(0,' + (this.props.height - 30) + ')';
         return (
-            <g class="" />
+            <g className="x axis" transform={transform} />
+        );
+    }
+});
+
+var YAxis = React.createClass({
+    componentDidMount: function () {
+        var yAxis = d3.svg.axis().orient('left').scale(this.props.y);
+        d3.select(this.getDOMNode()).call(yAxis);
+    },
+    render: function() {
+        var textAnchor = {
+            textAnchor: 'end'
+        };
+
+        return (
+            <g className="y axis">
+                <text transform="rotate(-90)" y="6" dy="1em" style={textAnchor}>Temperature (ºC)</text>
+            </g>
         );
     }
 });
@@ -54,9 +71,7 @@ var DataSeries = React.createClass({
         };
     },
     render: function() {
-        var self = this,
-            props = this.props,
-            y = this.props.y,
+        var y = this.props.y,
             x = this.props.x;
 
         var path = d3.svg.line()
@@ -73,27 +88,9 @@ var DataSeries = React.createClass({
 var LineChart = React.createClass({
     getDefaultProps: function() {
         return {
-            width: 600,
-            height: 300
+            width: 700,
+            height: 500
         };
-    },
-    componentDidMount: function () {
-        var svg = d3.select(this.getDOMNode().children[0]);
-
-        svg.insert('g', ':first-child')
-            .attr('class', 'y axis')
-            .call(yAxis)
-            .append('text')
-            .attr('transform', 'rotate(-90)')
-            .attr('y', 6)
-            .attr('dy', '1em')
-            .style('text-anchor', 'end')
-            .text('Temperature (ºC)');
-
-        svg.insert('g', ':first-child')
-            .attr('class', 'x axis')
-            .attr('transform', 'translate(0,' + (this.props.height - 40) + ')')
-            .call(xAxis);
     },
     render: function() {
         var data = this.props.data,
@@ -102,17 +99,11 @@ var LineChart = React.createClass({
                 height: this.props.height
             };
 
+        var scale = d3.scale.ordinal();
         var parseDate = d3.time.format('%Y').parse;
-
-        xAxis = d3.svg.axis().orient('bottom');
-        yAxis = d3.svg.axis().orient('left');
 
         var summer = [];
         var winter = [];
-
-        color.domain(d3.keys(data[0]).filter(function (key) {
-            return key !== 'year';
-        }));
 
         data.forEach(function (d) {
             if (typeof d.year === 'string') {
@@ -128,18 +119,6 @@ var LineChart = React.createClass({
                 year: d.year,
                 temperature: 4 + parseFloat(d.Winter)
             });
-        });
-
-        var series = color.domain().map(function (name) {
-            return {
-                name: name,
-                values: data.map(function (d) {
-                    return {
-                        year: d.year,
-                        temperature: d[name]
-                    };
-                })
-            };
         });
 
         var x = d3.time.scale()
@@ -159,13 +138,12 @@ var LineChart = React.createClass({
             ])
             .range([this.props.height, 0]);
 
-        xAxis.scale(x);
-        yAxis.scale(y);
-
         return (
             <Chart width={this.props.width} height={this.props.height}>
-                <DataSeries data={winter} size={size} x={x} y={y} ref="Winter" color="cornflowerblue" />
+                <XAxis x={x} height={this.props.height} />
+                <YAxis y={y} />
                 <DataSeries data={summer} size={size} x={x} y={y} ref="Summer" color="orange" />
+                <DataSeries data={winter} size={size} x={x} y={y} ref="Winter" color="cornflowerblue" />
             </Chart>
         );
     }

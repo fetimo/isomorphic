@@ -13,8 +13,5 @@ var margin = {top: 20, right: 80, bottom: 30, left: 50},
 React.render(new ReactApp({
     data: temperature,
     height: height,
-    width: width,
-    margin: {
-        transform: 'translate(' + margin.left + ', ' + margin.top + ')'
-    }
+    width: width
 }), mountNode);
